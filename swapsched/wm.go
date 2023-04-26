@@ -11,7 +11,7 @@ import (
 
 type ActiveWindowHandler func(int, int)
 
-func (cb ActiveWindowHandler) Monitor() error {
+func (cb ActiveWindowHandler) Monitor() (err error) {
 	conn, err := x.NewConn()
 	if err != nil {
 		logger.Warning(err)
@@ -66,7 +66,7 @@ func (cb ActiveWindowHandler) Monitor() error {
 			handlePropNotifyEvent(event)
 		}
 	}
-	return nil
+	return err
 }
 
 func (d *Dispatcher) ActiveWindowHandler(pid int, xid int) {

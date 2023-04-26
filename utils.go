@@ -7,6 +7,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"path"
@@ -34,7 +35,7 @@ const (
 	CopyFileOverWrite
 )
 
-func copyFileAux(src, dst string, copyFlag CopyFlag) error {
+func copyFileAux(src, dst string, copyFlag CopyFlag) (err error) {
 	srcStat, err := os.Lstat(src)
 	if err != nil {
 		return fmt.Errorf("Error os.Lstat src %s: %s", src, err)
@@ -47,7 +48,8 @@ func copyFileAux(src, dst string, copyFlag CopyFlag) error {
 	os.Remove(dst)
 	if (copyFlag&CopyFileNotKeepSymlink) != CopyFileNotKeepSymlink &&
 		(srcStat.Mode()&os.ModeSymlink) == os.ModeSymlink {
-		readlink, err := os.Readlink(src)
+		var readlink string
+		readlink, err = os.Readlink(src)
 		if err != nil {
 			return fmt.Errorf("error read symlink %s: %s", src,
 				err)
@@ -65,7 +67,16 @@ func copyFileAux(src, dst string, copyFlag CopyFlag) error {
 	if err != nil {
 		return fmt.Errorf("error opening src file %s: %s", src, err)
 	}
-	defer srcFile.Close()
+	defer func() {
+		closeErr := srcFile.Close()
+		if err == nil {
+			err = fmt.Errorf("error closing src file %s: %s", src, closeErr)
+		} else {
+			if closeErr != nil {
+				log.Printf("error on close file %v: %v", srcFile.Name(), closeErr)
+			}
+		}
+	}()
 
 	dstFile, err := os.OpenFile(
 		dst,
@@ -75,7 +86,16 @@ func copyFileAux(src, dst string, copyFlag CopyFlag) error {
 	if err != nil {
 		return fmt.Errorf("error opening dst file %s: %s", dst, err)
 	}
-	defer dstFile.Close()
+	defer func() {
+		closeErr := dstFile.Close()
+		if err == nil {
+			err = fmt.Errorf("error closing dst file %s: %s", dst, closeErr)
+		} else {
+			if closeErr != nil {
+				log.Printf("error on close file %v: %v", dstFile.Name(), closeErr)
+			}
+		}
+	}()
 
 	_, err = io.Copy(dstFile, srcFile)
 	if err != nil {
@@ -83,7 +103,7 @@ func copyFileAux(src, dst string, copyFlag CopyFlag) error {
 			err)
 	}
 
-	return nil
+	return
 }
 
 func copyFile(src, dst string, copyFlag CopyFlag) error {
@@ -114,13 +134,23 @@ func copyFile(src, dst string, copyFlag CopyFlag) error {
 	return copyFileAux(src, dst, copyFlag)
 }
 
-func syncFile(filename string) error {
+func syncFile(filename string) (err error) {
 	fh, err := os.Open(filename)
 	if err != nil {
-		return err
+		return
 	}
-	defer fh.Close()
-	return fh.Sync()
+	defer func() {
+		closeErr := fh.Close()
+		if err == nil {
+			err = closeErr
+		} else {
+			if closeErr != nil {
+				log.Printf("error on close file %v: %v", fh.Name(), closeErr)
+			}
+		}
+	}()
+	err = fh.Sync()
+	return
 }
 
 func getDelayTime(desktopFile string) (time.Duration, error) {

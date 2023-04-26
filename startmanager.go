@@ -120,7 +120,11 @@ func (m *StartManager) getCpuFreqAdjustMap(path string) map[string]int32 {
 		logger.Warning("open dde_startup.conf failed:", err)
 		return nil
 	}
-	defer fi.Close()
+	defer func() {
+		if err := fi.Close(); err != nil {
+			logger.Warning("close dde_startup.conf failed:", err)
+		}
+	}()
 
 	br := bufio.NewReader(fi)
 	for {
@@ -799,10 +803,11 @@ func scanDir(dir string, fn func(dir string, info os.FileInfo) bool) {
 	f, err := os.Open(dir)
 	defer func() {
 		if f != nil {
-			f.Close()
+			if closeErr := f.Close(); closeErr != nil {
+				logger.Warning("scanDir close dir failed:", closeErr)
+			}
 		}
 	}()
-
 	if err != nil {
 		logger.Error("scanDir open dir failed:", err)
 		return

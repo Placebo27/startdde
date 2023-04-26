@@ -7,6 +7,7 @@ package memanalyzer
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -42,7 +43,7 @@ func GetPidMemory(pid uint16) (uint64, error) {
 	return sumPidsMemory(list), nil
 }
 
-//SaveProcessMemory save process memory used info
+// SaveProcessMemory save process memory used info
 func SaveProcessMemory(name string, mem uint64) error {
 	setDB(name, mem)
 	return doSaveDB(getConfigPath())
@@ -65,15 +66,23 @@ func sumMemByPid(pid uint16) (uint64, error) {
 	return sumMemByFile(fmt.Sprintf("/proc/%v/status", pid))
 }
 
-func sumMemByFile(filename string) (uint64, error) {
+func sumMemByFile(filename string) (memSize uint64, err error) {
 	fr, err := os.Open(filename)
 	if err != nil {
-		return 0, err
+		return
 	}
-	defer fr.Close()
+	defer func() {
+		closeErr := fr.Close()
+		if err == nil {
+			err = closeErr
+		} else {
+			if closeErr != nil {
+				log.Printf("error on close file %v: %v", fr.Name(), closeErr)
+			}
+		}
+	}()
 
 	var count = 0
-	var memSize uint64
 	var scanner = bufio.NewScanner(fr)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -86,8 +95,8 @@ func sumMemByFile(filename string) (uint64, error) {
 			!strings.Contains(line, "VmPMD:") {
 			continue
 		}
-
-		v, err := getInteger(line)
+		var v uint64
+		v, err = getInteger(line)
 		if err != nil {
 			return 0, err
 		}
@@ -99,7 +108,7 @@ func sumMemByFile(filename string) (uint64, error) {
 		}
 	}
 
-	return memSize, nil
+	return
 }
 
 func getInteger(line string) (uint64, error) {

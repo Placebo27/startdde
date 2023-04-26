@@ -78,29 +78,38 @@ func fix(conn *dbus.Conn, userPath string) error {
 	return nil
 }
 
-func createXAuthFile(filename string, uid int) error {
+func createXAuthFile(filename string, uid int) (err error) {
 	fh, err := os.Create(filename)
 	if err != nil {
-		return err
+		return
 	}
-	defer fh.Close()
+	defer func() {
+		closeErr := fh.Close()
+		if err == nil {
+			err = closeErr
+		} else {
+			if closeErr != nil {
+				log.Printf("error on close file %v: %v", fh.Name(), closeErr)
+			}
+		}
+	}()
 
 	_, err = fh.Write([]byte{0})
 	if err != nil {
-		return err
+		return
 	}
 
 	err = fh.Chmod(stdXAuthFileMod)
 	if err != nil {
-		return err
+		return
 	}
 
 	err = fh.Chown(uid, uid)
 	if err != nil {
-		return err
+		return
 	}
 
-	return nil
+	return
 }
 
 func main() {

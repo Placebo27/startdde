@@ -6,6 +6,7 @@ package memchecker
 
 import (
 	"bufio"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -38,15 +39,23 @@ func GetMemInfo() (*MemoryInfo, error) {
 	return info, nil
 }
 
-func doGetMemInfo(filename string) (*MemoryInfo, error) {
+func doGetMemInfo(filename string) (info *MemoryInfo, err error) {
 	fr, err := os.Open(filename)
 	if err != nil {
-		return nil, err
+		return
 	}
-	defer fr.Close()
+	defer func() {
+		closeErr := fr.Close()
+		if err == nil {
+			err = closeErr
+		} else {
+			if closeErr != nil {
+				log.Printf("error on close file %v: %v", fr.Name(), closeErr)
+			}
+		}
+	}()
 
 	var scanner = bufio.NewScanner(fr)
-	var info = new(MemoryInfo)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "" {
@@ -79,7 +88,7 @@ func doGetMemInfo(filename string) (*MemoryInfo, error) {
 		}
 	}
 
-	return info, nil
+	return
 }
 
 func parseMemLine(line string) []string {
